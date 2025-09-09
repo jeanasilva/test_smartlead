@@ -1,0 +1,25 @@
+# Backend (Laravel) specific files
+backend/vendor/
+backend/node_modules/
+backend/public/storage
+backend/storage/*.key
+backend/.env
+backend/.env.*
+backend/bootstrap/cache/
+backend/*.log
+backend/*.cache
+backend/*.phpunit.result.cache
+
+# Frontend specific files
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/*.log
+
+# IDE files
+.idea/
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
