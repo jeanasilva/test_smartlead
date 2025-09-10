@@ -166,12 +166,31 @@ docker-compose exec app php artisan l5-swagger:generate
 
 ### 🌐 Deploy em Produção
 
-Para deploy em produção, consulte o arquivo [DEPLOY.md](./DEPLOY.md) que contém instruções detalhadas.
+#### Opção 1: Deploy Automático (GitHub Actions) ⭐ **RECOMENDADO**
 
-#### Deploy Rápido:
+**Deploy automático a cada push na main!**
+
+1. **Configure os secrets do GitHub** (consulte [GITHUB_SECRETS.md](./GITHUB_SECRETS.md))
+2. **Faça push** e veja o deploy automático acontecer! 
+
+```bash
+git add .
+git commit -m "feat: nova funcionalidade"
+git push origin main
+# 🚀 Deploy automático executado!
+```
+
+**Status do deploy**: Acompanhe em **Actions** no GitHub
+
+> 💡 **Não é necessário SSH** - O GitHub Actions se conecta diretamente no servidor usando senha.
+
+#### Opção 2: Deploy Manual no Servidor
+
+Para deploy manual, consulte o arquivo [DEPLOY.md](./DEPLOY.md) que contém instruções detalhadas.
+
 ```bash
 # No servidor de produção
-git clone <URL_DO_REPOSITORIO> smartlead
+git clone https://github.com/jeanasilva/test_smartlead.git smartlead
 cd smartlead
 cp .env.prod.example .env.prod
 # Configure .env.prod com suas credenciais
