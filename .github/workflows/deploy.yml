@@ -54,8 +54,8 @@ jobs:
           DB_PORT=3306
           DB_DATABASE=smartlead_db
           DB_USERNAME=smartlead
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_PASSWORD=testpassword
+          MYSQL_ROOT_PASSWORD=rootpassword
           
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           
@@ -92,6 +92,9 @@ jobs:
           
           # Aguardar containers iniciarem
           sleep 10
+          
+          # Copiar .env.prod para dentro do container
+          docker cp .env.prod smartlead_app:/var/www/html/.env
           
           # Executar migrations e seeders apenas se necessário
           docker exec smartlead_app php artisan migrate --force 2>/dev/null || true
