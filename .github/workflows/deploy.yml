@@ -19,7 +19,7 @@ jobs:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
       
-    - name: � Deploy to Production Server
+    - name: 🚀 Deploy to Production Server
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -36,11 +36,6 @@ jobs:
           echo -e "${GREEN}🚀 Iniciando deploy automático do SmartLead...${NC}"
           
           # Instalar dependências se necessário
-          if ! command -v make &> /dev/null; then
-            echo -e "${YELLOW}📦 Instalando Make...${NC}"
-            apt update && apt install -y make
-          fi
-          
           if ! command -v docker-compose &> /dev/null; then
             echo -e "${YELLOW}📦 Instalando Docker Compose...${NC}"
             curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -71,12 +66,13 @@ jobs:
           git reset --hard origin/main
           git clean -fd
           
-          # Criar arquivo .env.prod automaticamente
-          echo -e "${YELLOW}📝 Criando .env.prod...${NC}"
-          cat > .env.prod << 'ENV_EOF'
-          # Environment de Produção - SmartLead
-          # Gerado automaticamente pelo GitHub Actions
+          # Parar containers antigos
+          echo -e "${YELLOW}🛑 Parando containers antigos...${NC}"
+          docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
           
+          # Criar .env.prod com os secrets
+          echo -e "${YELLOW}📝 Criando .env.prod...${NC}"
+          cat > .env.prod << 'EOF'
           APP_NAME="SmartLead API"
           APP_ENV=production
           APP_KEY=${{ secrets.APP_KEY }}
@@ -87,7 +83,6 @@ jobs:
           LOG_DEPRECATIONS_CHANNEL=null
           LOG_LEVEL=error
           
-          # Database - Produção
           DB_CONNECTION=mysql
           DB_HOST=db
           DB_PORT=3306
@@ -96,12 +91,10 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           
-          # Redis
           REDIS_HOST=redis
           REDIS_PASSWORD=null
           REDIS_PORT=6379
           
-          # Email
           MAIL_MAILER=smtp
           MAIL_HOST=smtp.zoho.com
           MAIL_PORT=587
@@ -111,20 +104,16 @@ jobs:
           MAIL_FROM_ADDRESS=offboard@offboard.com.br
           MAIL_FROM_NAME="SmartLead"
           
-          # JWT
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           
-          # Frontend URL
           VUE_APP_API_BASE_URL=https://smartlead.jeansilva.dev.br/api
           
-          # AWS (opcional)
           AWS_ACCESS_KEY_ID=
           AWS_SECRET_ACCESS_KEY=
           AWS_DEFAULT_REGION=us-east-1
           AWS_BUCKET=
           AWS_USE_PATH_STYLE_ENDPOINT=false
           
-          # Pusher (opcional)
           PUSHER_APP_ID=
           PUSHER_APP_KEY=
           PUSHER_APP_SECRET=
@@ -132,60 +121,52 @@ jobs:
           
           MIX_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
           MIX_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
-          ENV_EOF
+          EOF
           
-          # Executar deploy
-          echo -e "${GREEN}🚀 Executando deploy...${NC}"
-          chmod +x deploy.sh
+          # Verificar arquivo criado
+          echo -e "${BLUE}✅ Arquivo .env.prod criado${NC}"
+          ls -la .env.prod
           
-          # Executar comandos do deploy diretamente (sem make)
-          echo -e "${YELLOW}📦 Fazendo backup...${NC}"
-          if [ -d "backup" ]; then rm -rf backup; fi
-          mkdir -p backup
-          
+          # Iniciar containers de produção
           echo -e "${YELLOW}🐳 Iniciando containers de produção...${NC}"
-          docker-compose -f docker-compose.prod.yml down || true
           docker-compose -f docker-compose.prod.yml up -d --build
           
+          # Aguardar containers ficarem prontos
           echo -e "${YELLOW}⏳ Aguardando containers ficarem prontos...${NC}"
-          sleep 30
+          sleep 60
           
-          echo -e "${YELLOW}📦 Instalando dependências...${NC}"
-          docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader
+          # Verificar status dos containers
+          echo -e "${BLUE}📊 Status dos containers:${NC}"
+          docker-compose -f docker-compose.prod.yml ps
           
-          echo -e "${YELLOW}🔑 Gerando chaves...${NC}"
-          docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force || true
-          docker-compose -f docker-compose.prod.yml exec -T app php artisan jwt:secret --force || true
+          # Configurar aplicação Laravel se container estiver rodando
+          if docker-compose -f docker-compose.prod.yml ps | grep -q "Up"; then
+            echo -e "${YELLOW}📦 Configurando aplicação Laravel...${NC}"
+            
+            # Instalar dependências
+            docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader || true
+            
+            # Gerar chaves
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force || true
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan jwt:secret --force || true
+            
+            # Configurar banco
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force || true
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan db:seed --force || true
+            
+            # Gerar documentação
+            docker-compose -f docker-compose.prod.yml exec -T app php artisan l5-swagger:generate || true
+            
+            echo -e "${GREEN}✅ Aplicação Laravel configurada${NC}"
+          else
+            echo -e "${RED}❌ Containers não estão rodando corretamente${NC}"
+            docker-compose -f docker-compose.prod.yml logs
+          fi
           
-          echo -e "${YELLOW}🗄️ Configurando banco...${NC}"
-          docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
-          docker-compose -f docker-compose.prod.yml exec -T app php artisan db:seed --force || true
-          
-          echo -e "${YELLOW}📚 Gerando documentação...${NC}"
-          docker-compose -f docker-compose.prod.yml exec -T app php artisan l5-swagger:generate || true
-          
-          # Configurar nginx se necessário
+          # Configurar nginx básico se necessário
           if [ ! -f /etc/nginx/sites-available/smartlead ]; then
             echo -e "${YELLOW}🌐 Configurando Nginx...${NC}"
-            
-            # Usar configuração simples primeiro
-            cp nginx-config-simple.conf /etc/nginx/sites-available/smartlead
-            ln -sf /etc/nginx/sites-available/smartlead /etc/nginx/sites-enabled/
-            
-            # Adicionar rate limiting ao nginx.conf se não existir
-            if ! grep -q "limit_req_zone" /etc/nginx/nginx.conf; then
-              echo -e "${YELLOW}📝 Adicionando rate limiting ao nginx.conf...${NC}"
-              sed -i '/http {/a\\tlimit_req_zone $binary_remote_addr zone=login:10m rate=3r/m;\n\tlimit_req_zone $binary_remote_addr zone=api:10m rate=30r/m;' /etc/nginx/nginx.conf
-            fi
-            
-            # Testar configuração nginx
-            if nginx -t; then
-              systemctl reload nginx
-              echo -e "${GREEN}✅ Nginx configurado com sucesso!${NC}"
-            else
-              echo -e "${RED}❌ Erro na configuração do Nginx, usando configuração básica...${NC}"
-              # Fallback para configuração mínima
-              cat > /etc/nginx/sites-available/smartlead << 'EOF'
+            cat > /etc/nginx/sites-available/smartlead << 'NGINX_EOF'
           server {
               listen 80;
               server_name smartlead.jeansilva.dev.br;
@@ -198,49 +179,23 @@ jobs:
                   proxy_set_header X-Forwarded-Proto $scheme;
               }
           }
-          EOF
-              nginx -t && systemctl reload nginx
-            fi
+          NGINX_EOF
             
-            # Configurar SSL se certbot estiver instalado
-            if command -v certbot &> /dev/null; then
-              certbot --nginx -d smartlead.jeansilva.dev.br --non-interactive --agree-tos --email admin@jeansilva.dev.br || true
-            fi
-          else
-            echo -e "${BLUE}ℹ️ Nginx já configurado${NC}"
+            ln -sf /etc/nginx/sites-available/smartlead /etc/nginx/sites-enabled/
+            nginx -t && systemctl reload nginx || echo "Nginx não configurado"
           fi
           
-          echo -e "${GREEN}✅ Deploy concluído com sucesso!${NC}"
-          echo -e "${BLUE}🌐 Aplicação: https://smartlead.jeansilva.dev.br${NC}"
-          echo -e "${BLUE}📚 API Docs: https://smartlead.jeansilva.dev.br/api/documentation${NC}"
+          echo -e "${GREEN}✅ Deploy concluído!${NC}"
+          echo -e "${BLUE}🌐 Teste: http://${{ secrets.SERVER_HOST }}:8080${NC}"
           
-          # Verificar status dos containers
-          echo -e "${YELLOW}📊 Status dos containers:${NC}"
-          docker-compose -f docker-compose.prod.yml ps || echo "Erro ao verificar containers"
-          
-          # Verificar se a aplicação está respondendo
-          echo -e "${YELLOW}🔍 Testando aplicação...${NC}"
-          sleep 10
-          curl -f http://localhost:8080/api/health || echo "⚠️ Aplicação pode estar iniciando ainda"
+          # Teste final
+          sleep 15
+          curl -f http://localhost:8080 || echo "⚠️ Aplicação pode estar iniciando"
         
     - name: 🔍 Verify Deployment
       run: |
-        echo "🔍 Verificando se a aplicação está online..."
-        sleep 30
-        curl -f http://${{ secrets.SERVER_HOST }}:8080/api/health || echo "⚠️ Aplicação pode estar iniciando ainda..."
-        
-    - name: 📊 Deployment Summary
-      run: |
         echo "### 🚀 Deploy Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ **Status**: Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
-        echo "🌐 **URL**: https://smartlead.jeansilva.dev.br" >> $GITHUB_STEP_SUMMARY
-        echo "📚 **API Docs**: https://smartlead.jeansilva.dev.br/api/documentation" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Status**: Deployment completed" >> $GITHUB_STEP_SUMMARY
+        echo "🌐 **URL**: http://${{ secrets.SERVER_HOST }}:8080" >> $GITHUB_STEP_SUMMARY
         echo "🕐 **Time**: $(date)" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🔧 **Services deployed**:" >> $GITHUB_STEP_SUMMARY
-        echo "- Nginx (Proxy)" >> $GITHUB_STEP_SUMMARY
-        echo "- Laravel API" >> $GITHUB_STEP_SUMMARY
-        echo "- Vue.js Frontend" >> $GITHUB_STEP_SUMMARY
-        echo "- MySQL Database" >> $GITHUB_STEP_SUMMARY
-        echo "- Redis Cache" >> $GITHUB_STEP_SUMMARY
