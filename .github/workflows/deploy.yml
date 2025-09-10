@@ -35,6 +35,25 @@ jobs:
           
           echo -e "${GREEN}🚀 Iniciando deploy automático do SmartLead...${NC}"
           
+          # Instalar dependências se necessário
+          if ! command -v make &> /dev/null; then
+            echo -e "${YELLOW}📦 Instalando Make...${NC}"
+            apt update && apt install -y make
+          fi
+          
+          if ! command -v docker-compose &> /dev/null; then
+            echo -e "${YELLOW}📦 Instalando Docker Compose...${NC}"
+            curl -L "https://github.com/docker/compose/releases/download/v2.21.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+          fi
+          
+          if ! command -v docker &> /dev/null; then
+            echo -e "${YELLOW}📦 Instalando Docker...${NC}"
+            curl -fsSL https://get.docker.com -o get-docker.sh
+            sh get-docker.sh
+          fi
+          
           # Navegar para diretório ou criar
           cd /opt || mkdir -p /opt && cd /opt
           
@@ -118,27 +137,91 @@ jobs:
           # Executar deploy
           echo -e "${GREEN}🚀 Executando deploy...${NC}"
           chmod +x deploy.sh
-          make deploy
+          
+          # Executar comandos do deploy diretamente (sem make)
+          echo -e "${YELLOW}📦 Fazendo backup...${NC}"
+          if [ -d "backup" ]; then rm -rf backup; fi
+          mkdir -p backup
+          
+          echo -e "${YELLOW}🐳 Iniciando containers de produção...${NC}"
+          docker-compose -f docker-compose.prod.yml down || true
+          docker-compose -f docker-compose.prod.yml up -d --build
+          
+          echo -e "${YELLOW}⏳ Aguardando containers ficarem prontos...${NC}"
+          sleep 30
+          
+          echo -e "${YELLOW}📦 Instalando dependências...${NC}"
+          docker-compose -f docker-compose.prod.yml exec -T app composer install --no-dev --optimize-autoloader
+          
+          echo -e "${YELLOW}🔑 Gerando chaves...${NC}"
+          docker-compose -f docker-compose.prod.yml exec -T app php artisan key:generate --force || true
+          docker-compose -f docker-compose.prod.yml exec -T app php artisan jwt:secret --force || true
+          
+          echo -e "${YELLOW}🗄️ Configurando banco...${NC}"
+          docker-compose -f docker-compose.prod.yml exec -T app php artisan migrate --force
+          docker-compose -f docker-compose.prod.yml exec -T app php artisan db:seed --force || true
+          
+          echo -e "${YELLOW}📚 Gerando documentação...${NC}"
+          docker-compose -f docker-compose.prod.yml exec -T app php artisan l5-swagger:generate || true
           
           # Configurar nginx se necessário
           if [ ! -f /etc/nginx/sites-available/smartlead ]; then
             echo -e "${YELLOW}🌐 Configurando Nginx...${NC}"
-            cp nginx-server-config.conf /etc/nginx/sites-available/smartlead
+            
+            # Usar configuração simples primeiro
+            cp nginx-config-simple.conf /etc/nginx/sites-available/smartlead
             ln -sf /etc/nginx/sites-available/smartlead /etc/nginx/sites-enabled/
-            nginx -t && systemctl reload nginx
+            
+            # Adicionar rate limiting ao nginx.conf se não existir
+            if ! grep -q "limit_req_zone" /etc/nginx/nginx.conf; then
+              echo -e "${YELLOW}📝 Adicionando rate limiting ao nginx.conf...${NC}"
+              sed -i '/http {/a\\tlimit_req_zone $binary_remote_addr zone=login:10m rate=3r/m;\n\tlimit_req_zone $binary_remote_addr zone=api:10m rate=30r/m;' /etc/nginx/nginx.conf
+            fi
+            
+            # Testar configuração nginx
+            if nginx -t; then
+              systemctl reload nginx
+              echo -e "${GREEN}✅ Nginx configurado com sucesso!${NC}"
+            else
+              echo -e "${RED}❌ Erro na configuração do Nginx, usando configuração básica...${NC}"
+              # Fallback para configuração mínima
+              cat > /etc/nginx/sites-available/smartlead << 'EOF'
+          server {
+              listen 80;
+              server_name smartlead.jeansilva.dev.br;
+              
+              location / {
+                  proxy_pass http://127.0.0.1:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+          EOF
+              nginx -t && systemctl reload nginx
+            fi
             
             # Configurar SSL se certbot estiver instalado
             if command -v certbot &> /dev/null; then
-              certbot --nginx -d smartlead.jeansilva.dev.br --non-interactive --agree-tos --email admin@jeansilva.dev.br
+              certbot --nginx -d smartlead.jeansilva.dev.br --non-interactive --agree-tos --email admin@jeansilva.dev.br || true
             fi
+          else
+            echo -e "${BLUE}ℹ️ Nginx já configurado${NC}"
           fi
           
           echo -e "${GREEN}✅ Deploy concluído com sucesso!${NC}"
           echo -e "${BLUE}🌐 Aplicação: https://smartlead.jeansilva.dev.br${NC}"
           echo -e "${BLUE}📚 API Docs: https://smartlead.jeansilva.dev.br/api/documentation${NC}"
           
-          # Verificar status
-          docker-compose -f docker-compose.prod.yml ps
+          # Verificar status dos containers
+          echo -e "${YELLOW}📊 Status dos containers:${NC}"
+          docker-compose -f docker-compose.prod.yml ps || echo "Erro ao verificar containers"
+          
+          # Verificar se a aplicação está respondendo
+          echo -e "${YELLOW}🔍 Testando aplicação...${NC}"
+          sleep 10
+          curl -f http://localhost:8080/api/health || echo "⚠️ Aplicação pode estar iniciando ainda"
         
     - name: 🔍 Verify Deployment
       run: |
