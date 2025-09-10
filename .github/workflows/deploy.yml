@@ -28,8 +28,13 @@ jobs:
             git clone https://github.com/jeanasilva/test_smartlead.git test_smartlead
           else
             cd test_smartlead
-            # Limpar alterações locais e fazer pull
-            git stash
+            # Verificar se há commits locais e descartar tudo
+            echo "🔄 Verificando e limpando alterações locais..."
+            git fetch origin
+            git reset --hard HEAD
+            git clean -fd
+            git checkout main
+            git reset --hard origin/main
             git pull origin main
             cd ..
           fi
@@ -90,5 +95,12 @@ jobs:
           
           # Executar migrations e seeders apenas se necessário
           docker exec smartlead_app php artisan migrate --force 2>/dev/null || true
+          
+          # Gerar documentação Swagger
+          docker exec smartlead_app php artisan l5-swagger:generate
+          
+          # Limpar cache
+          docker exec smartlead_app php artisan config:clear
+          docker exec smartlead_app php artisan cache:clear
           
           echo "✅ Deploy concluído com sucesso!"

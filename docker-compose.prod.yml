@@ -35,8 +35,8 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: smartlead_db
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_PASSWORD: testpassword
       MYSQL_USER: smartlead
     volumes:
       - mysql_data:/var/lib/mysql
@@ -64,8 +64,8 @@ services:
       PMA_HOST: db
       PMA_PORT: 3306
       PMA_USER: root
-      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PMA_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: rootpassword
     ports:
       - "8081:80"
     depends_on:
