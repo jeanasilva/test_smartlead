@@ -3,6 +3,11 @@
 ## Descrição
 Sistema completo de gerenciamento de tarefas e usuários desenvolvido com Laravel (API) + Vue.js (Frontend) para o teste técnico da SmartLead.
 
+## 🚀 Demo
+- **Frontend:** https://smartlead.jeansilva.dev.br
+- **API Docs:** https://smartlead.jeansilva.dev.br/api/documentation
+- **phpMyAdmin:** https://smartlead.jeansilva.dev.br/phpmyadmin
+
 ## Funcionalidades
 
 ### Backend (API)
@@ -17,7 +22,7 @@ Sistema completo de gerenciamento de tarefas e usuários desenvolvido com Larave
 - ✅ Documentação Swagger/OpenAPI
 - ✅ Middleware de proteção de rotas
 - ✅ Validação de requests
-- ✅ Notificações por email
+- ✅ Notificações por email (SMTP Zoho)
 
 ### Frontend (Vue.js)
 - ✅ Interface moderna e responsiva
@@ -40,7 +45,8 @@ Sistema completo de gerenciamento de tarefas e usuários desenvolvido com Larave
 - Swagger (L5-Swagger)
 - DomPDF para exportação
 - MySQL 8.0
-- Docker & Docker Compose
+- Redis (Cache)
+- PHP 8.2
 
 ### Frontend
 - Vue.js 2.x
@@ -50,15 +56,17 @@ Sistema completo de gerenciamento de tarefas e usuários desenvolvido com Larave
 - Tailwind CSS
 - SweetAlert2
 - Font Awesome
+- Nginx (Servidor web)
 
 ### Infraestrutura
 - Docker & Docker Compose
 - Nginx (Proxy Reverso)
 - Redis (Cache)
 - phpMyAdmin
+- GitHub Actions (CI/CD)
 - Cloudflare (CDN/SSL)
 
-## Instalação com Docker (Recomendado)
+## Instalação Local
 
 ### Pré-requisitos
 - Docker

@@ -23,24 +23,26 @@ jobs:
           
           cd /root
           
-          # Clone ou update
-          if [ ! -d "smartlead" ]; then
-            git clone https://github.com/jeanasilva/test_smartlead.git smartlead
+          # Clone ou update do repositorio
+          if [ ! -d "test_smartlead" ]; then
+            git clone https://github.com/jeanasilva/test_smartlead.git test_smartlead
           else
-            cd smartlead
+            cd test_smartlead
+            # Limpar alterações locais e fazer pull
+            git stash
             git pull origin main
             cd ..
           fi
           
-          cd smartlead
+          cd test_smartlead
           
-          # Criar .env simples
+          # Criar .env.prod
           cat > .env.prod << EOF
           APP_NAME="SmartLead API"
           APP_ENV=production
           APP_DEBUG=false
           APP_KEY=${{ secrets.APP_KEY }}
-          APP_URL=http://${{ secrets.SERVER_HOST }}:8080
+          APP_URL=https://smartlead.jeansilva.dev.br
           
           DB_CONNECTION=mysql
           DB_HOST=db
@@ -52,6 +54,10 @@ jobs:
           
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           
+          REDIS_HOST=redis
+          REDIS_PASSWORD=null
+          REDIS_PORT=6379
+          
           MAIL_MAILER=smtp
           MAIL_HOST=smtp.zoho.com
           MAIL_PORT=587
@@ -60,12 +66,29 @@ jobs:
           MAIL_ENCRYPTION=tls
           MAIL_FROM_ADDRESS=offboard@offboard.com.br
           MAIL_FROM_NAME="SmartLead"
+          
+          LOG_CHANNEL=stack
+          LOG_DEPRECATIONS_CHANNEL=null
+          LOG_LEVEL=debug
+          
+          BROADCAST_DRIVER=log
+          CACHE_DRIVER=file
+          FILESYSTEM_DISK=local
+          QUEUE_CONNECTION=sync
+          SESSION_DRIVER=file
+          SESSION_LIFETIME=120
           EOF
           
-          # Parar containers antigos
+          # Parar containers antigos se existirem
           docker-compose -f docker-compose.prod.yml down 2>/dev/null || true
           
-          # Subir containers
+          # Build e subir containers
           docker-compose -f docker-compose.prod.yml up -d --build
           
-          echo "✅ Deploy concluído"
+          # Aguardar containers iniciarem
+          sleep 10
+          
+          # Executar migrations e seeders apenas se necessário
+          docker exec smartlead_app php artisan migrate --force 2>/dev/null || true
+          
+          echo "✅ Deploy concluído com sucesso!"
