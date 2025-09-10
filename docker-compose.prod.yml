@@ -1,73 +1,27 @@
 services:
-  # Nginx Proxy Reverso
-  nginx:
-    image: nginx:alpine
-    container_name: smartlead_nginx
-    restart: unless-stopped
-    ports:
-      - "8080:80"     # Usando porta 8080 para evitar conflitos
-      - "8443:443"    # Usando porta 8443 para SSL
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - frontend_dist:/var/www/html
-    networks:
-      - smartlead-network
-    depends_on:
-      - app
-      - frontend
-
-  # Aplicação Laravel
+  # Laravel API
   app:
     build:
       context: ./backend
-      dockerfile: ../Dockerfile.prod
+      dockerfile: Dockerfile
     container_name: smartlead_app
     restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./backend:/var/www:delegated
-    networks:
-      - smartlead-network
+    ports:
+      - "8080:80"
+    env_file:
+      - .env.prod
     depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DB_CONNECTION=mysql
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_DATABASE=smartlead_db
-      - DB_USERNAME=smartlead
-      - DB_PASSWORD=${DB_PASSWORD}
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - APP_URL=https://smartlead.jeansilva.dev.br
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Frontend Vue.js (Build para produção)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-    container_name: smartlead_frontend
-    restart: unless-stopped
+      - db
     volumes:
-      - frontend_dist:/app/dist
+      - ./backend:/var/www
     networks:
-      - smartlead-network
-    environment:
-      - VUE_APP_API_BASE_URL=https://smartlead.jeansilva.dev.br/api
+      - smartlead
 
-  # Banco de dados MySQL
+  # MySQL Database
   db:
     image: mysql:8.0
-    container_name: smartlead_mysql
+    container_name: smartlead_db
     restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password --innodb-buffer-pool-size=512M --max_connections=500
     environment:
       MYSQL_DATABASE: smartlead_db
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -76,34 +30,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - smartlead-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      - smartlead
 
-  # Redis para cache e sessões
-  redis:
-    image: redis:7-alpine
-    container_name: smartlead_redis
-    restart: unless-stopped
-    volumes:
-      - redis_data:/data
-    networks:
-      - smartlead-network
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-
-# Volumes
 volumes:
   mysql_data:
-    driver: local
-  redis_data:
-    driver: local
-  frontend_dist:
-    driver: local
 
-# Networks
 networks:
-  smartlead-network:
+  smartlead:
     driver: bridge
