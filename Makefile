@@ -1,53 +1,96 @@
-# Makefile para SmartLead API
+# Makefile para o projeto SmartLead
 
-.PHONY: help build up down install migrate seed docs clean logs
+.PHONY: help install up down logs clean shell mysql docs restart build dev prod deploy
+
+# Cores para output
+BLUE=\033[0;34m
+GREEN=\033[0;32m
+YELLOW=\033[1;33m
+RED=\033[0;31m
+NC=\033[0m # No Color
 
 help: ## Mostra esta ajuda
-	@echo "SmartLead API - Comandos disponíveis:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@echo "$(BLUE)SmartLead - Comandos disponíveis:$(NC)"
+	@echo ""
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
 
-build: ## Constroi as imagens Docker
-	docker-compose build --no-cache
+install: ## Instala o projeto completo (desenvolvimento)
+	@echo "$(YELLOW)📦 Instalando SmartLead (Desenvolvimento)...$(NC)"
+	@if [ ! -f backend/.env ]; then cp backend/.env.example backend/.env; fi
+	@docker-compose up -d --build
+	@echo "$(YELLOW)⏳ Aguardando containers ficarem prontos...$(NC)"
+	@sleep 20
+	@docker-compose exec app composer install
+	@docker-compose exec app php artisan key:generate --force
+	@docker-compose exec app php artisan jwt:secret --force
+	@docker-compose exec app php artisan migrate --force
+	@docker-compose exec app php artisan db:seed --force
+	@docker-compose exec app php artisan l5-swagger:generate
+	@echo "$(GREEN)✅ Instalação concluída!$(NC)"
+	@echo ""
+	@echo "$(BLUE)🌐 Serviços disponíveis:$(NC)"
+	@echo "  Frontend:     http://localhost:3000"
+	@echo "  API:          http://localhost:8000"
+	@echo "  Documentação: http://localhost:8000/api/documentation"
+	@echo "  phpMyAdmin:   http://localhost:8080"
+	@echo ""
 
-up: ## Inicia os containers
-	docker-compose up -d
+dev: ## Inicia ambiente de desenvolvimento
+	@echo "$(YELLOW)🚀 Iniciando ambiente de desenvolvimento...$(NC)"
+	@docker-compose up -d
+	@echo "$(GREEN)✅ Ambiente iniciado!$(NC)"
+	@echo "  Frontend: http://localhost:3000"
+	@echo "  Backend:  http://localhost:8000"
+
+prod: ## Inicia ambiente de produção
+	@echo "$(YELLOW)🚀 Iniciando ambiente de produção...$(NC)"
+	@if [ ! -f .env.prod ]; then echo "$(RED)❌ Arquivo .env.prod não encontrado!$(NC)"; exit 1; fi
+	@docker-compose -f docker-compose.prod.yml up -d --build
+	@echo "$(GREEN)✅ Ambiente de produção iniciado!$(NC)"
+
+deploy: ## Execute o deploy completo (apenas no servidor)
+	@echo "$(YELLOW)🚀 Executando deploy...$(NC)"
+	@chmod +x deploy.sh
+	@./deploy.sh
+
+up: ## Inicia os containers (desenvolvimento)
+	@echo "$(YELLOW)🚀 Iniciando containers...$(NC)"
+	@docker-compose up -d
 
 down: ## Para os containers
-	docker-compose down
+	@echo "$(YELLOW)🛑 Parando containers...$(NC)"
+	@docker-compose down
+	@docker-compose -f docker-compose.prod.yml down || true
 
-install: ## Instala dependências e configura a aplicação
-	docker-compose up -d db
-	@echo "Aguardando MySQL inicializar..."
-	@sleep 15
-	docker-compose up -d app
-	@echo "Instalando dependências..."
-	docker-compose exec app composer install
-	docker-compose exec app php artisan key:generate
-	docker-compose exec app php artisan jwt:secret --force
-	@echo "Executando migrações..."
-	docker-compose exec app php artisan migrate --force
-	@echo "Gerando documentação..."
-	docker-compose exec app php artisan l5-swagger:generate
-	@echo "✅ Aplicação configurada com sucesso!"
+logs: ## Mostra os logs dos containers
+	@docker-compose logs -f
 
-migrate: ## Executa as migrações
-	docker-compose exec app php artisan migrate
+clean: ## Limpa cache e containers
+	@echo "$(YELLOW)🧹 Limpando cache...$(NC)"
+	@docker-compose exec app php artisan cache:clear || true
+	@docker-compose exec app php artisan config:clear || true
+	@docker system prune -f
 
-seed: ## Executa os seeders
-	docker-compose exec app php artisan db:seed
+shell: ## Acessa o shell do container da aplicação
+	@docker-compose exec app bash
 
-docs: ## Gera documentação Swagger
-	docker-compose exec app php artisan l5-swagger:generate
+mysql: ## Acessa o MySQL
+	@docker-compose exec db mysql -u smartlead -ppassword smartlead_db
 
-clean: ## Limpa cache da aplicação
-	docker-compose exec app php artisan cache:clear
-	docker-compose exec app php artisan config:clear
-	docker-compose exec app php artisan route:clear
+docs: ## Regenera a documentação Swagger
+	@echo "$(YELLOW)📚 Gerando documentação...$(NC)"
+	@docker-compose exec app php artisan l5-swagger:generate
+	@echo "$(GREEN)✅ Documentação gerada!$(NC)"
+	@echo "  Acesse: http://localhost:8000/api/documentation"
 
-logs: ## Mostra os logs da aplicação
-	docker-compose logs -f app
+restart: ## Reinicia os containers
+	@echo "$(YELLOW)🔄 Reiniciando containers...$(NC)"
+	@docker-compose restart
 
-restart: down up ## Reinicia os containers
+build: ## Reconstrói as imagens Docker
+	@echo "$(YELLOW)🏗️ Reconstruindo imagens...$(NC)"
+	@docker-compose build --no-cache
 
 shell: ## Acessa o shell do container da aplicação
 	docker-compose exec app bash

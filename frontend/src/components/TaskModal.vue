@@ -64,9 +64,9 @@
               :class="{ 'border-red-300': errors.priority }"
             >
               <option value="">Selecione a prioridade</option>
-              <option value="low">Baixa</option>
-              <option value="medium">Média</option>
-              <option value="high">Alta</option>
+              <option value="baixa">Baixa</option>
+              <option value="media">Média</option>
+              <option value="alta">Alta</option>
             </select>
             <p v-if="errors.priority" class="mt-1 text-sm text-red-600">
               {{ errors.priority }}
@@ -82,10 +82,9 @@
               v-model="form.status"
               class="form-select"
             >
-              <option value="pending">Pendente</option>
-              <option value="in_progress">Em Progresso</option>
-              <option value="completed">Concluída</option>
-              <option value="cancelled">Cancelada</option>
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="concluida">Concluída</option>
             </select>
           </div>
 
@@ -113,7 +112,7 @@
             </label>
             <select
               id="assigned_to"
-              v-model="form.assigned_to_id"
+              v-model="form.user_id"
               class="form-select"
             >
               <option value="">Selecione um usuário</option>
@@ -169,12 +168,11 @@ export default {
         title: '',
         description: '',
         priority: '',
-        status: 'pending',
+        status: 'pendente',
         due_date: '',
-        assigned_to_id: ''
+        user_id: ''
       },
       errors: {},
-      loading: false,
       users: []
     }
   },
@@ -186,21 +184,61 @@ export default {
       return new Date().toISOString().split('T')[0]
     }
   },
-  async created() {
-    await this.loadUsers()
-    
-    if (this.task) {
-      this.form = {
-        title: this.task.title || '',
-        description: this.task.description || '',
-        priority: this.task.priority || '',
-        status: this.task.status || 'pending',
-        due_date: this.task.due_date ? this.task.due_date.split(' ')[0] : '',
-        assigned_to_id: this.task.assigned_to_id || ''
-      }
+  watch: {
+    task: {
+      handler(newTask) {
+        if (newTask) {
+          this.form = {
+            title: newTask.title || '',
+            description: newTask.description || '',
+            priority: newTask.priority || '',
+            status: newTask.status || 'pendente',
+            due_date: this.formatDateForInput(newTask.due_date),
+            user_id: newTask.user_id || ''
+          }
+        } else {
+          // Reset form for new task
+          this.form = {
+            title: '',
+            description: '',
+            priority: '',
+            status: 'pendente',
+            due_date: '',
+            user_id: ''
+          }
+        }
+      },
+      immediate: true
     }
   },
+
+  async created() {
+    await this.loadUsers()
+  },
   methods: {
+    formatDateForInput(dateString) {
+      if (!dateString) return ''
+
+      try {
+        // Se já está no formato correto (yyyy-MM-dd)
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+          return dateString
+        }
+
+        // Se está no formato ISO (2025-09-10T00:00:00.000000Z)
+        const date = new Date(dateString)
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split('T')[0]
+        }
+
+        // Fallback: tentar extrair apenas a parte da data
+        return dateString.split('T')[0].split(' ')[0]
+      } catch (error) {
+        console.error('Erro ao formatar data:', error)
+        return ''
+      }
+    },
+
     async loadUsers() {
       try {
         const response = await this.$http.get('/users')
@@ -212,9 +250,10 @@ export default {
 
     async handleSubmit() {
       this.errors = {}
-      this.loading = true
 
       try {
+        this.$emit('loading', true)
+
         const url = this.isEditMode ? `/tasks/${this.task.id}` : '/tasks'
         const method = this.isEditMode ? 'put' : 'post'
 
@@ -243,7 +282,7 @@ export default {
           })
         }
       } finally {
-        this.loading = false
+        this.$emit('loading', false)
       }
     }
   }

@@ -71,6 +71,25 @@ services:
     depends_on:
       - db
 
+  # Frontend Vue.js
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: smartlead_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app:delegated
+      - /app/node_modules
+    networks:
+      - smartlead-network
+    environment:
+      - VUE_APP_API_BASE_URL=http://localhost:8000/api
+    depends_on:
+      - app
+
   # Redis para cache e sessões
   redis:
     image: redis:7-alpine

@@ -81,17 +81,26 @@ export default {
   name: 'AppHeader',
   data() {
     return {
-      showUserDropdown: false,
-      menuItems: [
+      showUserDropdown: false
+    }
+  },
+  computed: {
+    ...mapGetters('auth', ['isAuthenticated', 'user', 'isAdmin']),
+    menuItems() {
+      const items = [
         { path: '/', label: 'Dashboard', icon: 'fas fa-tachometer-alt' },
         { path: '/tasks', label: 'Tarefas', icon: 'fas fa-tasks' },
         { path: '/companies', label: 'Empresas', icon: 'fas fa-building' },
         { path: '/reports', label: 'Relatórios', icon: 'fas fa-chart-bar' }
       ]
-    }
-  },
-  computed: {
-    ...mapGetters('auth', ['isAuthenticated', 'user']),
+      
+      // Adicionar Management apenas para admins
+      if (this.isAdmin) {
+        items.push({ path: '/management', label: 'Usuários', icon: 'fas fa-users-cog' })
+      }
+      
+      return items
+    },
     userName() {
       return this.user?.name || 'Usuário'
     },

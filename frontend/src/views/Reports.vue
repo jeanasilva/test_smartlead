@@ -56,10 +56,19 @@
             <label class="form-label">Status</label>
             <select v-model="filters.status" class="form-select">
               <option value="">Todos</option>
-              <option value="pending">Pendente</option>
-              <option value="in_progress">Em Progresso</option>
-              <option value="completed">Concluída</option>
-              <option value="cancelled">Cancelada</option>
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="concluida">Concluída</option>
+            </select>
+          </div>
+          
+          <div>
+            <label class="form-label">Prioridade</label>
+            <select v-model="filters.priority" class="form-select">
+              <option value="">Todas</option>
+              <option value="alta">Alta</option>
+              <option value="media">Média</option>
+              <option value="baixa">Baixa</option>
             </select>
           </div>
           
@@ -315,6 +324,7 @@ export default {
         start_date: '',
         end_date: '',
         status: '',
+        priority: '',
         user_id: ''
       },
       users: [],
@@ -386,14 +396,29 @@ export default {
       this.loading = true
       
       try {
-        const params = { ...this.filters, format: 'pdf' }
-        const response = await this.$http.get('/export/report/summary', {
+        // Converter filtros para o formato esperado pelo backend
+        const params = {
+          status: this.filters.status,
+          priority: this.filters.priority,
+          user_id: this.filters.user_id,
+          date_from: this.filters.start_date,
+          date_to: this.filters.end_date
+        }
+        
+        // Remover parâmetros vazios
+        Object.keys(params).forEach(key => {
+          if (params[key] === '' || params[key] === null || params[key] === undefined) {
+            delete params[key]
+          }
+        })
+        
+        const response = await this.$http.get('/export/tasks/pdf', {
           params,
           responseType: 'blob'
         })
         
         // Criar link para download
-        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
         const link = document.createElement('a')
         link.href = url
         link.setAttribute('download', `relatorio-tarefas-${new Date().toISOString().split('T')[0]}.pdf`)
@@ -424,17 +449,32 @@ export default {
       this.loading = true
       
       try {
-        const params = { ...this.filters, format: 'excel' }
+        // Converter filtros para o formato esperado pelo backend
+        const params = {
+          status: this.filters.status,
+          priority: this.filters.priority,
+          user_id: this.filters.user_id,
+          date_from: this.filters.start_date,
+          date_to: this.filters.end_date
+        }
+        
+        // Remover parâmetros vazios
+        Object.keys(params).forEach(key => {
+          if (params[key] === '' || params[key] === null || params[key] === undefined) {
+            delete params[key]
+          }
+        })
+        
         const response = await this.$http.get('/export/tasks/csv', {
           params,
           responseType: 'blob'
         })
         
-        // Criar link para download
-        const url = window.URL.createObjectURL(new Blob([response.data]))
+        // Criar link para download com o tipo correto
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }))
         const link = document.createElement('a')
         link.href = url
-        link.setAttribute('download', `relatorio-tarefas-${new Date().toISOString().split('T')[0]}.xlsx`)
+        link.setAttribute('download', `relatorio-tarefas-${new Date().toISOString().split('T')[0]}.csv`)
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)

@@ -103,8 +103,13 @@
           
           <!-- Credenciais de teste -->
           <div style="margin-top: 2rem; padding: 1rem; background-color: #f3f4f6; border-radius: 0.5rem; border: 1px solid #e5e7eb;">
-            <h4 style="font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">Credenciais de Teste:</h4>
-            <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0;">Email: teste@smartlead.com</p>
+            <h4 style="font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">Credenciais de Teste Admin:</h4>
+            <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0;">Email: admin@smartlead.com</p>
+            <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0;">Senha: password123</p>
+          </div>
+          <div style="margin-top: 2rem; padding: 1rem; background-color: #f3f4f6; border-radius: 0.5rem; border: 1px solid #e5e7eb;">
+            <h4 style="font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.5rem;">Credenciais de Teste User:</h4>
+            <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0;">Email: maria@exemplo.com</p>
             <p style="font-size: 0.75rem; color: #6b7280; margin: 0.25rem 0;">Senha: password123</p>
           </div>
         </form>

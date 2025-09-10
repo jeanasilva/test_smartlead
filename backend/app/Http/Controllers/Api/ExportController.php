@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Task;
 use Carbon\Carbon;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 /**
  * @OA\Tag(
@@ -121,18 +122,30 @@ class ExportController extends Controller
             
             // Dados
             foreach ($tasks as $task) {
+                $statusMap = [
+                    'pendente' => 'Pendente',
+                    'em_andamento' => 'Em Andamento',
+                    'concluida' => 'Concluída'
+                ];
+                
+                $priorityMap = [
+                    'baixa' => 'Baixa',
+                    'media' => 'Média',
+                    'alta' => 'Alta'
+                ];
+                
                 fputcsv($file, [
                     $task->id,
                     $task->title,
                     $task->description ?: '',
-                    ucfirst(str_replace('_', ' ', $task->status)),
-                    ucfirst($task->priority),
-                    $task->due_date ? $task->due_date->format('d/m/Y') : '',
-                    $task->user->name,
-                    $task->user->email,
-                    $task->company->name,
-                    $task->created_at->format('d/m/Y H:i:s'),
-                    $task->updated_at->format('d/m/Y H:i:s')
+                    $statusMap[$task->status] ?? $task->status,
+                    $priorityMap[$task->priority] ?? $task->priority,
+                    $task->due_date ? Carbon::parse($task->due_date)->format('d/m/Y') : '',
+                    $task->user->name ?? 'N/A',
+                    $task->user->email ?? 'N/A',
+                    $task->company->name ?? 'N/A',
+                    $task->created_at ? $task->created_at->format('d/m/Y H:i:s') : '',
+                    $task->updated_at ? $task->updated_at->format('d/m/Y H:i:s') : ''
                 ]);
             }
             
@@ -280,5 +293,122 @@ class ExportController extends Controller
             'tasks_by_priority' => $tasksByPriority,
             'users_performance' => $usersPerformance
         ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/export/tasks/pdf",
+     *     summary="Exportar tarefas para PDF",
+     *     tags={"Export"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         description="Filtrar por status",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"pendente", "em_andamento", "concluida"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="priority",
+     *         in="query",
+     *         description="Filtrar por prioridade",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"baixa", "media", "alta"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_from",
+     *         in="query",
+     *         description="Data inicial",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_to",
+     *         in="query",
+     *         description="Data final",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Arquivo PDF",
+     *         @OA\MediaType(mediaType="application/pdf")
+     *     ),
+     *     @OA\Response(response=401, description="Não autorizado")
+     * )
+     */
+    public function tasksPdf(Request $request)
+    {
+        $user = Auth::user();
+        
+        if ($user->isAdmin()) {
+            // Admin pode exportar todas as tarefas
+            $query = Task::with(['user:id,name,email', 'company:id,name']);
+        } else {
+            // User pode exportar apenas tarefas da sua empresa
+            $query = Task::forCompany($user->company_id)
+                ->with(['user:id,name,email', 'company:id,name']);
+        }
+        
+        // Aplicar filtros
+        if ($request->has('status')) {
+            $query->byStatus($request->status);
+        }
+        
+        if ($request->has('priority')) {
+            $query->byPriority($request->priority);
+        }
+        
+        if ($request->has('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        
+        if ($request->has('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+        
+        $tasks = $query->latest()->get();
+        
+        // Gerar estatísticas
+        $total = $tasks->count();
+        $completed = $tasks->where('status', 'concluida')->count();
+        $inProgress = $tasks->where('status', 'em_andamento')->count();
+        $pending = $tasks->where('status', 'pendente')->count();
+        
+        $statusLabels = [
+            'pendente' => 'Pendente',
+            'em_andamento' => 'Em Andamento', 
+            'concluida' => 'Concluída'
+        ];
+        
+        $priorityLabels = [
+            'baixa' => 'Baixa',
+            'media' => 'Média',
+            'alta' => 'Alta'
+        ];
+        
+        // Criar HTML do PDF
+        $html = view('exports.tasks-pdf', [
+            'tasks' => $tasks,
+            'stats' => [
+                'total' => $total,
+                'completed' => $completed,
+                'in_progress' => $inProgress,
+                'pending' => $pending
+            ],
+            'company' => $user->isAdmin() ? 'Todas as Empresas' : $user->company->name,
+            'generated_at' => Carbon::now()->format('d/m/Y H:i:s'),
+            'statusLabels' => $statusLabels,
+            'priorityLabels' => $priorityLabels,
+            'filters' => $request->all()
+        ])->render();
+        
+        // Usar DomPDF para gerar o PDF
+        $pdf = Pdf::loadHTML($html);
+        $pdf->setPaper('A4', 'portrait');
+        
+        $filename = 'relatorio-tarefas-' . Carbon::now()->format('Y-m-d_H-i-s') . '.pdf';
+        
+        return $pdf->download($filename);
     }
 }

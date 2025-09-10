@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ExportController;
 
 // Health check para Docker
 Route::get('/health', function () {
@@ -52,6 +53,15 @@ Route::middleware(['auth:api', 'company.access'])->group(function () {
         Route::post('companies', [CompanyController::class, 'store']);
         Route::put('companies/{company}', [CompanyController::class, 'update']);
         Route::delete('companies/{company}', [CompanyController::class, 'destroy']);
+        
+        // Gerenciamento de usuários (Admin only)
+        Route::prefix('management')->group(function () {
+            Route::get('users', [UserController::class, 'index']);
+            Route::post('users', [UserController::class, 'store']);
+            Route::get('users/{user}', [UserController::class, 'show']);
+            Route::put('users/{user}', [UserController::class, 'update']);
+            Route::delete('users/{user}', [UserController::class, 'destroy']);
+        });
     });
     
     // Dashboard
@@ -64,6 +74,7 @@ Route::middleware(['auth:api', 'company.access'])->group(function () {
     // Exportação
     Route::prefix('export')->group(function () {
         Route::get('tasks/csv', [ExportController::class, 'tasksCsv']);
+        Route::get('tasks/pdf', [ExportController::class, 'tasksPdf']);
         Route::get('report/summary', [ExportController::class, 'reportSummary']);
     });
     

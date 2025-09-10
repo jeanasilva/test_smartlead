@@ -1,0 +1,59 @@
+# Dockerfile para produção do backend
+FROM php:8.1-fpm-alpine
+
+# Instalar dependências do sistema
+RUN apk add --no-cache \
+    nginx \
+    supervisor \
+    curl \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    git \
+    mysql-client
+
+# Instalar extensões PHP
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_mysql \
+        gd \
+        zip \
+        bcmath \
+        opcache
+
+# Instalar Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Configurar diretório de trabalho
+WORKDIR /var/www
+
+# Copiar código da aplicação
+COPY backend/ .
+
+# Instalar dependências PHP
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Configurar permissões
+RUN chown -R www-data:www-data /var/www \
+    && chmod -R 755 /var/www/storage \
+    && chmod -R 755 /var/www/bootstrap/cache
+
+# Configurar PHP-FPM
+RUN echo "listen = 0.0.0.0:9000" >> /usr/local/etc/php-fpm.d/zz-docker.conf
+
+# Configurar OPcache para produção
+RUN echo "opcache.enable=1" >> /usr/local/etc/php/php.ini \
+    && echo "opcache.enable_cli=1" >> /usr/local/etc/php/php.ini \
+    && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/php.ini \
+    && echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/php.ini \
+    && echo "opcache.max_accelerated_files=4000" >> /usr/local/etc/php/php.ini \
+    && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/php.ini
+
+# Expor porta
+EXPOSE 9000
+
+# Comando de inicialização
+CMD ["php-fpm"]

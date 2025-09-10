@@ -10,6 +10,7 @@ import Tasks from '@/views/Tasks.vue'
 import Companies from '@/views/Companies.vue'
 import Profile from '@/views/Profile.vue'
 import Reports from '@/views/Reports.vue'
+import Management from '@/views/Management.vue'
 
 Vue.use(VueRouter)
 
@@ -62,6 +63,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/management',
+    name: 'Management',
+    component: Management,
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: '*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue')
@@ -77,22 +84,28 @@ const router = new VueRouter({
 // Guard de autenticação
 router.beforeEach((to, from, next) => {
   const isAuthenticated = store.getters['auth/isAuthenticated']
+  const isAdmin = store.getters['auth/isAdmin']
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresGuest = to.matched.some(record => record.meta.requiresGuest)
+  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin)
   
   // Debug para verificar o estado
   console.log('Navigation Guard:', {
     to: to.path,
     from: from.path,
     isAuthenticated,
+    isAdmin,
     requiresAuth,
-    requiresGuest
+    requiresGuest,
+    requiresAdmin
   })
   
   if (requiresAuth && !isAuthenticated) {
     // Use replace instead of push for auth redirects
     next({ path: '/login', replace: true })
   } else if (requiresGuest && isAuthenticated) {
+    next({ path: '/', replace: true })
+  } else if (requiresAdmin && !isAdmin) {
     next({ path: '/', replace: true })
   } else {
     next()

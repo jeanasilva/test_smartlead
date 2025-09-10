@@ -31,6 +31,27 @@ class UserController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", example=15)
      *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Buscar por nome ou email",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="query",
+     *         description="Filtrar por role",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"admin","user"})
+     *     ),
+     *     @OA\Parameter(
+     *         name="company_id",
+     *         in="query",
+     *         description="Filtrar por empresa",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Lista de usuários",
@@ -48,16 +69,33 @@ class UserController extends Controller
         $user = \Illuminate\Support\Facades\Auth::user();
         $perPage = $request->get('per_page', 15);
         
+        $query = User::with('company:id,name');
+        
         if ($user->isAdmin()) {
             // Admin vê todos os usuários de todas as empresas
-            $users = User::with('company:id,name')
-                ->paginate($perPage);
+            
+            // Filtros para admin
+            if ($request->has('search') && $request->search) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+            
+            if ($request->has('role') && $request->role) {
+                $query->where('role', $request->role);
+            }
+            
+            if ($request->has('company_id') && $request->company_id) {
+                $query->where('company_id', $request->company_id);
+            }
         } else {
             // User vê apenas usuários da mesma empresa
-            $users = User::where('company_id', $user->company_id)
-                ->with('company:id,name')
-                ->paginate($perPage);
+            $query->where('company_id', $user->company_id);
         }
+        
+        $users = $query->orderBy('created_at', 'desc')->paginate($perPage);
         
         return response()->json($users);
     }
@@ -210,9 +248,15 @@ class UserController extends Controller
             'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
             'password' => 'sometimes|required|string|min:6',
             'role' => 'sometimes|in:admin,user',
+            'company_id' => 'sometimes|required|exists:companies,id',
         ]);
 
         $data = $request->only(['name', 'email', 'role']);
+        
+        // Apenas admin pode alterar company_id
+        if ($currentUser->isAdmin() && $request->has('company_id')) {
+            $data['company_id'] = $request->company_id;
+        }
         
         if ($request->has('password')) {
             $data['password'] = Hash::make($request->password);
