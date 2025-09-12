@@ -591,7 +591,6 @@ docker-compose down
 ## Deploy em Produção
 
 ### Estrutura do Servidor (Ubuntu 20.04 LTS)
-- **IP**: 192.95.8.20
 - **Domínio**: smartlead.jeansilva.dev.br
 - **SSL**: Cloudflare (Automatic HTTPS)
 - **Proxy**: Nginx
@@ -678,3 +677,4 @@ docker-compose exec app php artisan config:clear
 ## Contato
 
 Desenvolvido por Jean Silva para o teste técnico da SmartLead.
+
