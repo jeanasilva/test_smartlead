@@ -3,19 +3,19 @@ services:
   app:
     build:
       context: ./backend
-      dockerfile: ../Dockerfile
+      dockerfile: Dockerfile
     container_name: smartlead_app
     restart: unless-stopped
-    working_dir: /var/www
+    working_dir: /var/www/html
     volumes:
-      - ./backend:/var/www:delegated  # Otimização para Windows/macOS
+      - ./backend:/var/www/html:delegated  # Otimização para Windows/macOS
     networks:
       - smartlead-network
     depends_on:
       db:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8000:80"
     environment:
       - DB_CONNECTION=mysql
       - DB_HOST=db

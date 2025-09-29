@@ -25,7 +25,8 @@
                                     "name",
                                     "email",
                                     "password",
-                                    "password_confirmation"
+                                    "password_confirmation",
+                                    "company_name"
                                 ],
                                 "properties": {
                                     "name": {
@@ -47,10 +48,10 @@
                                         "format": "password",
                                         "example": "password123"
                                     },
-                                    "company_id": {
-                                        "description": "ID da empresa (opcional, padrão: 1)",
-                                        "type": "integer",
-                                        "example": 1
+                                    "company_name": {
+                                        "description": "Nome da empresa",
+                                        "type": "string",
+                                        "example": "SmartLead"
                                     }
                                 },
                                 "type": "object"
@@ -842,6 +843,81 @@
                 ]
             }
         },
+        "/api/export/tasks/pdf": {
+            "get": {
+                "tags": [
+                    "Export"
+                ],
+                "summary": "Exportar tarefas para PDF",
+                "operationId": "f07d03fdf2c20e7173654a6638af5b32",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filtrar por status",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pendente",
+                                "em_andamento",
+                                "concluida"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "priority",
+                        "in": "query",
+                        "description": "Filtrar por prioridade",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baixa",
+                                "media",
+                                "alta"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "description": "Data inicial",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "description": "Data final",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Arquivo PDF",
+                        "content": {
+                            "application/pdf": {}
+                        }
+                    },
+                    "401": {
+                        "description": "Não autorizado"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tasks": {
             "get": {
                 "tags": [
@@ -1222,6 +1298,37 @@
                         "schema": {
                             "type": "integer",
                             "example": 15
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Buscar por nome ou email",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "description": "Filtrar por role",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "admin",
+                                "user"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "company_id",
+                        "in": "query",
+                        "description": "Filtrar por empresa",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
                         }
                     }
                 ],
